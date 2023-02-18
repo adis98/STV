@@ -1,0 +1,9 @@
+FedXGB/.idea/
+FedXGB/Include/
+FedXGB/Lib/
+FedXGB/Scripts/
+FedXGB/share/
+*.cfg
+FedXGB/xgboost/
+__pycache__/
+.ipynb_checkpoints/
