@@ -23,43 +23,18 @@ def mean(L):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv('AirQualityUCI/AirQualityUCI.csv', sep=';', decimal=',')
-    data.drop(['Unnamed: 15', 'Unnamed: 16'], axis=1, inplace=True)
-    data.replace(to_replace=',', value='.', regex=True, inplace=True)
-
-    for i in 'C6H6(GT) T RH AH'.split():
-        data[i] = pd.to_numeric(data[i], errors='coerce')
-    data.replace(to_replace=-200, value=np.nan, inplace=True)
-    data['Date'] = pd.to_datetime(data['Date'], dayfirst=True).dt.date
-    data['Time'] = pd.to_datetime(data['Time'], format='%H.%M.%S').dt.time
-    data.drop('NMHC(GT)', axis=1, inplace=True)
-    data.drop_duplicates(inplace=True)
-    data.dropna(how='any', axis=0, inplace=True)
-
-    data.reset_index(drop=True, inplace=True)
-    datetimecol = pd.to_datetime(data['Date'].astype(str) + ' ' + data['Time'].astype(str))
-    data['DateTime'] = datetimecol
-    data.drop(['Date', 'Time'], axis=1, inplace=True)
-    cols = data.columns.tolist()
-    cols = cols[-1:] + cols[:-1]
-    data = data[cols]
-    data['year'] = data['DateTime'].dt.year
-    data['month'] = data['DateTime'].dt.month
-    data['day'] = data['DateTime'].dt.day
-    data['hour'] = data['DateTime'].dt.hour
-    data.drop(['DateTime'], axis=1, inplace=True)
-
+    data = pd.read_csv('ETT-small/ETTh1.csv')
     # assume for now we're trying to predict the CO(GT) column
     train_valid_ratio = 0.8
 
-    X,Y = data.drop(columns=['CO(GT)']), data[['CO(GT)']]
+    X, Y = data.drop(columns=['OT', 'date']), data[['OT']]
 
     minmax_scaler = MinMaxScaler()
     X = minmax_scaler.fit_transform(X)
     Y = minmax_scaler.fit_transform(Y)
     train_test_split_ratio = 0.8
 
-    for winsz in [50, 100, 200, 400]:
+    for winsz in [1000, 2000, 4000, 8000]:
         num_windows = len(Y) // winsz
         mse_sarimax_mle, mse_sarimax_ne, mse_lstm, mse_skforecast = [], [], [], []
         mape_sarimax_mle, mape_sarimax_ne, mape_lstm, mape_skforecast = [], [], [], []
@@ -69,7 +44,7 @@ if __name__ == "__main__":
             Y_train = Y[int(i * winsz):int(i * winsz) + int(train_test_split_ratio * winsz)]
             Y_test = Y[int(i * winsz) + int(train_test_split_ratio * winsz):int(i * winsz) + winsz]
 
-            auto_arima_res = auto_arima(Y_train, start_p=0, start_q=0, seasonal=False)
+            auto_arima_res = auto_arima(Y_train, seasonal=False)
             (p, d, q), (P, D, Q, S) = auto_arima_res.order, auto_arima_res.seasonal_order
 
             """SARIMAX NE"""
@@ -79,14 +54,14 @@ if __name__ == "__main__":
             Y_predictions_sarimax_ne = sarimax.forecast(X_test, Y_test)
             mse_sarimax_ne.append(mean_squared_error(Y_test, Y_predictions_sarimax_ne))
             mape_sarimax_ne.append(mean_absolute_percentage_error(Y_test, Y_predictions_sarimax_ne))
-            # print(mse_sarimax_ne[-1])
-            # plt.plot(Y_predictions_sarimax_ne, c='green', label='SARIMAX_NE')
+            plt.plot(Y_predictions_sarimax_ne, c='green', label='SARIMAX_NE')
 
             """SARIMAX MLE"""
-            sarimodel = sm.tsa.statespace.SARIMAX(Y_train, exog=X_train, order=(p, d, q), seasonal_order=(P, D, Q, S))
+            sarimodel = sm.tsa.statespace.SARIMAX(Y_train, exog=X_train, order=(p, d, q),
+                                                  seasonal_order=(P, D, Q, S))
             res = sarimodel.fit(disp=False)
             Y_predictions_sarimax_mle = res.forecast(len(Y_test), exog=X_test)
-            # plt.plot(Y_predictions_sarimax_mle, c='blue', label='SARIMAX_MLE')
+            plt.plot(Y_predictions_sarimax_mle, c='blue', label='SARIMAX_MLE')
             mse_sarimax_mle.append(mean_squared_error(Y_test, Y_predictions_sarimax_mle))
             mape_sarimax_mle.append(mean_absolute_percentage_error(Y_test, Y_predictions_sarimax_mle))
 
@@ -144,13 +119,13 @@ if __name__ == "__main__":
             forecaster.fit(y=pd.Series(np.reshape(Y_train, (-1,))), exog=pd.DataFrame(X_train))
             Y_predictions_skforecast = forecaster.predict(steps=len(Y_test),
                                                           exog=pd.DataFrame(X_test)).to_numpy()
-            # plt.plot(Y_predictions_skforecast, 'y', label='Skforecast')
+            plt.plot(Y_predictions_skforecast, 'y', label='Skforecast')
             #
             mse_skforecast.append(mean_squared_error(Y_test, Y_predictions_skforecast))
             mape_skforecast.append(mean_absolute_percentage_error(Y_test, Y_predictions_skforecast))
-            # plt.plot(Y_test, c='black', label="True output")
-            # plt.legend()
-            # plt.show()
+            plt.plot(Y_test, c='black', label="True output")
+            plt.legend()
+            plt.show()
 
         print("Prequential Window size:", winsz, "MSE SARIMAX NE:", mean(mse_sarimax_ne), "MSE SARIMAX MLE:",
               mean(mse_sarimax_mle), "MSE LSTM:", mean(mse_lstm), "MSE Skforecast:", mean(mse_skforecast))

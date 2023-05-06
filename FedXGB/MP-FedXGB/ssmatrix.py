@@ -5,7 +5,7 @@ from SSCalculate_Alternative import *
 from copy import deepcopy
 
 np.random.seed(10)
-clientNum = 2
+clientNum = 4
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
@@ -135,11 +135,19 @@ if __name__ == "__main__":
     Y = None
     # The true matrix is [1,2,3,4]
     if rank == 1:
-        A = np.array([[1, 2], [0, 0]])
+        A = np.array([[1, 0], [0, 0]])
         Y = np.array([[2], [1]])
 
     if rank == 2:
-        A = np.array([[0, 0], [3, 4]])
+        A = np.array([[0, 0], [3, 0]])
+        Y = np.zeros((2, 1))
+
+    if rank == 3:
+        A = np.array([[0, 2], [0, 0]])
+        Y = np.zeros((2, 1))
+
+    if rank == 4:
+        A = np.array([[0, 0], [0, 4]])
         Y = np.zeros((2, 1))
 
     if rank == 0:

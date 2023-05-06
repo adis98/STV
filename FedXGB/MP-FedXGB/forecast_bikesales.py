@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_percentage_error
 from pmdarima.arima import auto_arima
 from sklearn.preprocessing import MinMaxScaler
-from SarimaPolynomial import SARIMAX_POLYPROCESSOR, SARITRAX
+from SarimaPolynomial import SARIMAX_POLYPROCESSOR
 from keras.layers import Dense, LSTM
 from keras import Sequential
 import statsmodels.api as sm
@@ -23,43 +23,16 @@ def mean(L):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv('AirQualityUCI/AirQualityUCI.csv', sep=';', decimal=',')
-    data.drop(['Unnamed: 15', 'Unnamed: 16'], axis=1, inplace=True)
-    data.replace(to_replace=',', value='.', regex=True, inplace=True)
-
-    for i in 'C6H6(GT) T RH AH'.split():
-        data[i] = pd.to_numeric(data[i], errors='coerce')
-    data.replace(to_replace=-200, value=np.nan, inplace=True)
-    data['Date'] = pd.to_datetime(data['Date'], dayfirst=True).dt.date
-    data['Time'] = pd.to_datetime(data['Time'], format='%H.%M.%S').dt.time
-    data.drop('NMHC(GT)', axis=1, inplace=True)
-    data.drop_duplicates(inplace=True)
-    data.dropna(how='any', axis=0, inplace=True)
-
-    data.reset_index(drop=True, inplace=True)
-    datetimecol = pd.to_datetime(data['Date'].astype(str) + ' ' + data['Time'].astype(str))
-    data['DateTime'] = datetimecol
-    data.drop(['Date', 'Time'], axis=1, inplace=True)
-    cols = data.columns.tolist()
-    cols = cols[-1:] + cols[:-1]
-    data = data[cols]
-    data['year'] = data['DateTime'].dt.year
-    data['month'] = data['DateTime'].dt.month
-    data['day'] = data['DateTime'].dt.day
-    data['hour'] = data['DateTime'].dt.hour
-    data.drop(['DateTime'], axis=1, inplace=True)
-
-    # assume for now we're trying to predict the CO(GT) column
-    train_valid_ratio = 0.8
-
-    X,Y = data.drop(columns=['CO(GT)']), data[['CO(GT)']]
-
+    np.random.seed(123)
+    data = pd.read_csv('Bike-Sharing-Dataset/day.csv', sep=',', decimal='.')
+    data.drop(columns=['dteday', 'casual'], inplace=True)
+    X, Y = data.drop(columns=['cnt']), data[["cnt"]]
+    # 'casual', 'dteday', and 'registered' columns have been removed from the features
     minmax_scaler = MinMaxScaler()
     X = minmax_scaler.fit_transform(X)
     Y = minmax_scaler.fit_transform(Y)
     train_test_split_ratio = 0.8
-
-    for winsz in [50, 100, 200, 400]:
+    for winsz in [50,100,200,400]:
         num_windows = len(Y) // winsz
         mse_sarimax_mle, mse_sarimax_ne, mse_lstm, mse_skforecast = [], [], [], []
         mape_sarimax_mle, mape_sarimax_ne, mape_lstm, mape_skforecast = [], [], [], []
@@ -143,7 +116,7 @@ if __name__ == "__main__":
 
             forecaster.fit(y=pd.Series(np.reshape(Y_train, (-1,))), exog=pd.DataFrame(X_train))
             Y_predictions_skforecast = forecaster.predict(steps=len(Y_test),
-                                                          exog=pd.DataFrame(X_test)).to_numpy()
+                                                     exog=pd.DataFrame(X_test)).to_numpy()
             # plt.plot(Y_predictions_skforecast, 'y', label='Skforecast')
             #
             mse_skforecast.append(mean_squared_error(Y_test, Y_predictions_skforecast))
@@ -152,8 +125,10 @@ if __name__ == "__main__":
             # plt.legend()
             # plt.show()
 
-        print("Prequential Window size:", winsz, "MSE SARIMAX NE:", mean(mse_sarimax_ne), "MSE SARIMAX MLE:",
-              mean(mse_sarimax_mle), "MSE LSTM:", mean(mse_lstm), "MSE Skforecast:", mean(mse_skforecast))
-        print("Prequential Window size:", winsz, "MAPE SARIMAX NE:", mean(mape_sarimax_ne), "MAPE SARIMAX MLE:",
-              mean(mape_sarimax_mle), "MAPE LSTM:", mean(mape_lstm), "MAPE Skforecast:", mean(mape_skforecast))
-        # plt.plot(y_window_train_lstm)
+        print("Prequential Window size:", winsz, "MSE SARIMAX NE:", mean(mse_sarimax_ne), "MSE SARIMAX MLE:", mean(mse_sarimax_mle), "MSE LSTM:", mean(mse_lstm), "MSE Skforecast:", mean(mse_skforecast))
+        print("Prequential Window size:", winsz, "MAPE SARIMAX NE:", mean(mape_sarimax_ne), "MAPE SARIMAX MLE:", mean(mape_sarimax_mle), "MAPE LSTM:", mean(mape_lstm), "MAPE Skforecast:", mean(mape_skforecast))
+            # plt.plot(y_window_train_lstm)
+
+
+
+
