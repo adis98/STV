@@ -11,6 +11,7 @@ import statsmodels.api as sm
 from xgboost import XGBRegressor
 import warnings
 from skforecast.ForecasterAutoreg import ForecasterAutoreg
+import tensorflow as tf
 
 warnings.filterwarnings("ignore")
 
@@ -23,6 +24,8 @@ def mean(L):
 
 
 if __name__ == "__main__":
+    np.random.seed(123)
+    tf.random.set_seed(123)
     data = pd.read_csv('SML2010/NEW-DATA-1.T15.txt', sep=' ')
     columns = data.columns.values[2:]
     for i in range(len(columns)):
@@ -38,8 +41,9 @@ if __name__ == "__main__":
     Y = minmax_scaler.fit_transform(Y)
     train_test_split_ratio = 0.8
 
-    for winsz in [50, 100, 200, 400]:
+    for winsz in [50, 400]:
         num_windows = len(Y) // winsz
+        num_windows = 1
         mse_sarimax_ne = []
         mse_sarimax_mle = []
         mse_skforecast = []
@@ -55,19 +59,19 @@ if __name__ == "__main__":
             (p, d, q), (P, D, Q, S) = auto_arima_res.order, auto_arima_res.seasonal_order
 
             """SARIMAX NE"""
-            # sarimax = SARIMAX_POLYPROCESSOR(p, d, q, P, D, Q, S, Y_train, X_train)
-            # sarimax.step1()
-            # sarimax.step2(X_train)
-            # Y_predictions_sarimax_ne = sarimax.forecast(X_test, Y_test)
-            # mse_sarimax_ne.append(mean_squared_error(Y_test, Y_predictions_sarimax_ne))
-            # # plt.plot(Y_predictions_sarimax_ne, c='green', label='SARIMAX_NE')
+            sarimax = SARIMAX_POLYPROCESSOR(p, d, q, P, D, Q, S, Y_train, X_train)
+            sarimax.step1()
+            sarimax.step2(X_train)
+            Y_predictions_sarimax_ne = sarimax.forecast(X_test, Y_test)
+            mse_sarimax_ne.append(mean_squared_error(Y_test, Y_predictions_sarimax_ne))
+            plt.plot(Y_predictions_sarimax_ne, c='green', label='$STV_{L}(SARIMAX)$')
 
             """SARIMAX MLE"""
-            # sarimodel = sm.tsa.statespace.SARIMAX(Y_train, exog=X_train, order=(p, d, q), seasonal_order=(P, D, Q, S))
-            # res = sarimodel.fit(disp=False)
-            # Y_predictions_sarimax_mle = res.forecast(len(Y_test), exog=X_test)
-            # # plt.plot(Y_predictions_sarimax_mle, c='blue', label='SARIMAX_MLE')
-            # mse_sarimax_mle.append(mean_squared_error(Y_test, Y_predictions_sarimax_mle))
+            sarimodel = sm.tsa.statespace.SARIMAX(Y_train, exog=X_train, order=(p, d, q), seasonal_order=(P, D, Q, S))
+            res = sarimodel.fit(disp=False)
+            Y_predictions_sarimax_mle = res.forecast(len(Y_test), exog=X_test)
+            plt.plot(Y_predictions_sarimax_mle, c='blue', label='SARIMAX MLE')
+            mse_sarimax_mle.append(mean_squared_error(Y_test, Y_predictions_sarimax_mle))
 
             """LSTM"""
             poly = SARIMAX_POLYPROCESSOR(p, d, q, P, D, Q, S, Y_train, X_train)
@@ -104,26 +108,39 @@ if __name__ == "__main__":
                 curr_ind += 1
 
             Y_predictions_LSTM = np.array(predicts)
-            # plt.plot(Y_predictions_LSTM, c='red', label='LSTM')
+            plt.plot(Y_predictions_LSTM, c='red', label='LSTM')
             mse_lstm.append(mean_squared_error(Y_test, Y_predictions_LSTM))
 
             """Skforecast"""
-            # poly = SARIMAX_POLYPROCESSOR(p, d, q, P, D, Q, S, Y_train, X_train)
-            # xgreg = XGBRegressor(random_state=123, max_depth=5)
-            # xgreg.fit(X_train, Y_train)
-            # y_window_train_pred = xgreg.predict(X_train)
-            #
-            # forecaster = ForecasterAutoreg(
-            #     regressor=XGBRegressor(random_state=123, max_depth=3),
-            #     lags=max(1, len(poly.ar_poly) - 1)
-            # )
-            #
-            # forecaster.fit(y=pd.Series(np.reshape(Y_train, (-1,))), exog=pd.DataFrame(X_train))
-            # Y_predictions_skforecast = forecaster.predict(steps=len(Y_test),
-            #                                               exog=pd.DataFrame(X_test)).to_numpy()
-            # # plt.plot(y_window_valid_pred, 'y', label='Skforecast')
-            #
-            # mse_skforecast.append(mean_squared_error(Y_test, Y_predictions_skforecast))
+            poly = SARIMAX_POLYPROCESSOR(p, d, q, P, D, Q, S, Y_train, X_train)
+            xgreg = XGBRegressor(random_state=123, max_depth=5)
+            xgreg.fit(X_train, Y_train)
+            y_window_train_pred = xgreg.predict(X_train)
+
+            forecaster = ForecasterAutoreg(
+                regressor=XGBRegressor(random_state=123, max_depth=3),
+                lags=max(1, len(poly.ar_poly) - 1)
+            )
+
+            forecaster.fit(y=pd.Series(np.reshape(Y_train, (-1,))), exog=pd.DataFrame(X_train))
+            Y_predictions_skforecast = forecaster.predict(steps=len(Y_test),
+                                                          exog=pd.DataFrame(X_test)).to_numpy()
+            plt.plot(Y_predictions_skforecast, c='orange', label='$STV_{T}$')
+
+            """Diffusion models"""
+            filename = "diffusion_forecasts/forecast_sml2010_diffusion_" + str(winsz) + ".npy"
+            Y_predictions_diffusion = np.load(filename)
+            plt.plot(Y_predictions_diffusion, label="$SSSD^{S4} Diffusion$", c="magenta")
+            plt.plot(Y_test, label="True output", c="black")
+
+            plt.rcParams.update({'font.size': 15})
+            plt.ylabel("output value")
+            plt.legend()
+            imgfile = "forecast_plots/sml2010_" + str(winsz) + ".pdf"
+            plt.savefig(imgfile)
+            plt.clf()
+
+            mse_skforecast.append(mean_squared_error(Y_test, Y_predictions_skforecast))
 
         print("Prequential Window size:", winsz, "MSE SARIMAX NE:", mean(mse_sarimax_ne), "MSE SARIMAX MLE:",
               mean(mse_sarimax_mle), "MSE LSTM:", mean(mse_lstm), "MSE Skforecast:", mean(mse_skforecast))

@@ -4,6 +4,7 @@ from statsmodels.tsa.tsatools import lagmat
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from sklearn.metrics import r2_score, mean_squared_error
 from pmdarima.arima import auto_arima
 from sklearn.preprocessing import MinMaxScaler
@@ -25,6 +26,7 @@ def mean(L):
 
 if __name__ == "__main__":
     np.random.seed(123)
+    tf.random.set_seed(123)
     data = sns.load_dataset('flights')
     monthLst = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     intLst = list(range(12))
@@ -37,8 +39,10 @@ if __name__ == "__main__":
     Y = minmax_scaler.fit_transform(Y)
     train_test_split_ratio = 0.8
 
-    for winsz in [60, 80, 100, 120, len(Y)]:
+
+    for winsz in [60, len(Y)]: # [60, 80, 100, 120, len(Y)]
         num_windows = len(Y) // winsz
+        num_windows = 1
         mse_sarimax_ne = []
         mse_sarimax_mle = []
         mse_skforecast = []
@@ -50,6 +54,7 @@ if __name__ == "__main__":
             Y_train = Y[int(i * winsz):int(i * winsz) + int(train_test_split_ratio * winsz)]
             Y_test = Y[int(i * winsz) + int(train_test_split_ratio * winsz):int(i * winsz) + winsz]
 
+
             # auto_arima_res = auto_arima(Y_train, seasonal=True, D=12)
             # (p, d, q), (P, D, Q, S) = auto_arima_res.order, auto_arima_res.seasonal_order
             (p, d, q), (P, D, Q, S) = (1, 1, 1), (1, 1, 1, 12)
@@ -60,13 +65,13 @@ if __name__ == "__main__":
             sarimax.step2(X_train)
             Y_predictions_sarimax_ne = sarimax.forecast(X_test, Y_test)
             mse_sarimax_ne.append(mean_squared_error(Y_test, Y_predictions_sarimax_ne))
-            # plt.plot(Y_predictions_sarimax_ne, c='green', label='SARIMAX_NE')
+            plt.plot(Y_predictions_sarimax_ne, c='green', label='$STV_{L}(SARIMAX)$')
 
             """SARIMAX MLE"""
             sarimodel = sm.tsa.statespace.SARIMAX(Y_train, exog=X_train, order=(p, d, q), seasonal_order=(P, D, Q, S))
             res = sarimodel.fit(disp=False)
             Y_predictions_sarimax_mle = res.forecast(len(Y_test), exog=X_test)
-            # plt.plot(Y_predictions_sarimax_mle, c='blue', label='SARIMAX_MLE')
+            plt.plot(Y_predictions_sarimax_mle, c='blue', label='SARIMAX MLE')
             mse_sarimax_mle.append(mean_squared_error(Y_test, Y_predictions_sarimax_mle))
 
             """LSTM"""
@@ -104,7 +109,7 @@ if __name__ == "__main__":
                 curr_ind += 1
 
             Y_predictions_LSTM = np.array(predicts)
-            # plt.plot(Y_predictions_LSTM, c='red', label='LSTM')
+            plt.plot(Y_predictions_LSTM, c='red', label='LSTM')
             mse_lstm.append(mean_squared_error(Y_test, Y_predictions_LSTM))
 
             """Skforecast"""
@@ -121,12 +126,23 @@ if __name__ == "__main__":
             forecaster.fit(y=pd.Series(np.reshape(Y_train, (-1,))), exog=pd.DataFrame(X_train))
             Y_predictions_skforecast = forecaster.predict(steps=len(Y_test),
                                                           exog=pd.DataFrame(X_test)).to_numpy()
-            # plt.plot(Y_predictions_skforecast, 'y', label='Skforecast')
+            plt.plot(Y_predictions_skforecast, c='orange', label='$STV_{T}$')
 
             mse_skforecast.append(mean_squared_error(Y_test, Y_predictions_skforecast))
-            # plt.plot(Y_test, label="True output", c='black')
-            # plt.legend()
-            # plt.show()
+
+
+            """Diffusion models"""
+            filename = "diffusion_forecasts/forecast_flights_diffusion_"+str(winsz)+".npy"
+            Y_predictions_diffusion = np.load(filename)
+            plt.plot(Y_predictions_diffusion, label="$SSSD^{S4} Diffusion$", c="magenta")
+            plt.plot(Y_test, label="True output", c="black")
+
+            plt.rcParams.update({'font.size': 15})
+            plt.ylabel("output value")
+            plt.legend()
+            imgfile = "forecast_plots/flights_"+str(winsz)+".pdf"
+            plt.savefig(imgfile)
+            plt.clf()
 
         print("Prequential Window size:", winsz, "MSE SARIMAX NE:", mean(mse_sarimax_ne), "MSE SARIMAX MLE:",
               mean(mse_sarimax_mle), "MSE LSTM:", mean(mse_lstm), "MSE Skforecast:", mean(mse_skforecast), "MSE SARITRAX:", mean(mse_saritrax))
