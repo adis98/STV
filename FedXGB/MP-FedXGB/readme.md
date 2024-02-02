@@ -1,4 +1,4 @@
-# MP-FedXGB
+# VFL XGBoost documentation
 
 This is a federated XGBoost project. Our project is designed using secret sharing (SS) encryption scheme. It's tightly linked to *An Efficient Learning Framework For Federated XGBoostUsing Secret Sharing And Distributed Optimization*.
 
