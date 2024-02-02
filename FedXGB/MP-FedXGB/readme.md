@@ -9,7 +9,7 @@ This repository contains the code for a forecasting framework with *vertical fed
 2. Forecasting tests: ```forecast_<DATASET>.py```
 3. Secret-sharing primitives: ```SSCalculation.py``` and ```SSCalculate_Alternate.py```
 4. VFL XGBoost code based on **MP-FedXGB**: ```VerticalXGBoost.py```, with documentation: https://github.com/HikariX/MP-FedXGB
-5. Original diffusion model for time series repository: https://github.com/AI4HealthUOL/SSSD. Additional results and minor extensions in: https://github.com/adis98/SSSD/tree/master
+5. Original diffusion model for time series repository: https://github.com/AI4HealthUOL/SSSD. Additional results and minor extensions in: https://anonymous.4open.science/r/SSSD-DE14/README.md
 
 # Datasets
 1. Rossman Sales: https://www.kaggle.com/c/rossmann-store-sales/data
